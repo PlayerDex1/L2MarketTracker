@@ -16,27 +16,30 @@ import Register from './pages/Register';
 import CreateClan from './pages/CreateClan';
 import Market from './pages/Market';
 import { AuthProvider } from './contexts/AuthContext';
+import { ClanDataProvider } from './contexts/ClanDataContext';
 
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/create-clan" element={<CreateClan />} />
-          <Route path="/apply" element={<Apply />} />
-          <Route path="/apply/:clanId" element={<Apply />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="members" element={<Members />} />
-            <Route path="cps" element={<ConstantParties />} />
-            <Route path="applications" element={<Applications />} />
-            <Route path="market" element={<Market />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <ClanDataProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/create-clan" element={<CreateClan />} />
+            <Route path="/apply" element={<Apply />} />
+            <Route path="/apply/:clanId" element={<Apply />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="members" element={<Members />} />
+              <Route path="cps" element={<ConstantParties />} />
+              <Route path="applications" element={<Applications />} />
+              <Route path="market" element={<Market />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ClanDataProvider>
     </AuthProvider>
   );
 }

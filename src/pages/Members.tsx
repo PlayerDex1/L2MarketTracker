@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, Plus, Shield, ShieldAlert, User, Trash2, Swords, Filter, X, Edit2, ClipboardCheck, CheckSquare, Square, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
+import { useClanData } from '../contexts/ClanDataContext';
 
 const CLASS_COLORS: Record<string, string> = {
   Tank: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -24,73 +25,7 @@ function getAvatarColor(name: string) {
 }
 
 export default function Members() {
-  const [members, setMembers] = useState<any[]>([
-    {
-      id: 'm1',
-      in_game_name: 'AdminPlayer',
-      role: 'leader',
-      join_date: '2023-01-15T00:00:00Z',
-      cp_name: 'Alpha Squad',
-      class: 'Paladin',
-      class_group: 'Tank',
-      level: 85,
-      combat_power: 45000,
-      activity_points: 120,
-      status: 'active'
-    },
-    {
-      id: 'm2',
-      in_game_name: 'HealMePls',
-      role: 'officer',
-      join_date: '2023-02-20T00:00:00Z',
-      cp_name: 'Alpha Squad',
-      class: 'Bishop',
-      class_group: 'Healer',
-      level: 84,
-      combat_power: 42000,
-      activity_points: 85,
-      status: 'active'
-    },
-    {
-      id: 'm3',
-      in_game_name: 'StabbyStab',
-      role: 'member',
-      join_date: '2023-03-10T00:00:00Z',
-      cp_name: null,
-      class: 'Treasure Hunter',
-      class_group: 'Melee DPS',
-      level: 82,
-      combat_power: 38000,
-      activity_points: 15,
-      status: 'inactive'
-    },
-    {
-      id: 'm4',
-      in_game_name: 'BowMaster',
-      role: 'member',
-      join_date: '2023-04-01T00:00:00Z',
-      cp_name: 'Bravo Team',
-      class: 'Hawkeye',
-      class_group: 'Archer',
-      level: 83,
-      combat_power: 40000,
-      activity_points: 60,
-      status: 'active'
-    },
-    {
-      id: 'm5',
-      in_game_name: 'SingForMe',
-      role: 'member',
-      join_date: '2023-04-15T00:00:00Z',
-      cp_name: 'Bravo Team',
-      class: 'Swordsinger',
-      class_group: 'Buffer',
-      level: 81,
-      combat_power: 35000,
-      activity_points: 45,
-      status: 'active'
-    },
-  ]);
+  const { members, setMembers } = useClanData();
 
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('All');
@@ -297,9 +232,8 @@ export default function Members() {
                         </div>
                       </div>
                     </div>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                      member.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-800 text-zinc-500'
-                    }`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${member.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-800 text-zinc-500'
+                      }`}>
                       {member.status}
                     </span>
                   </div>
@@ -440,11 +374,10 @@ export default function Members() {
                           type="button"
                           key={m.id}
                           onClick={() => toggleAttendanceMember(m.id)}
-                          className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${
-                            isChecked
+                          className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${isChecked
                               ? 'bg-emerald-500/10 border-emerald-500/30'
                               : 'bg-zinc-950/50 border-zinc-800 hover:border-zinc-700'
-                          }`}
+                            }`}
                         >
                           {isChecked
                             ? <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0" />
