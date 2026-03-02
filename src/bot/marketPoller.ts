@@ -20,50 +20,80 @@ function guessIconUrl(itemName: string): string {
   return 'https://l2db.info/icon/weapon_the_sword_of_hero_i00.png';
 }
 
+// Remove Discord custom emojis like <:zcoin:1234> or <zcoin1234>
+function cleanEmojis(text: string): string {
+  return text
+    .replace(/<:[^:]+:\d+>/g, '')
+    .replace(/<\w+\d+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Parse price and name from Discord message (embed or plain text)
 function parseMessage(msg: any): { name: string; price: number; currency: string } | null {
-  // Try embeds first
   if (msg.embeds && msg.embeds.length > 0) {
     const embed = msg.embeds[0];
-    const rawText = [
-      embed.title,
-      embed.description,
-      ...(embed.fields || []).map((f: any) => `${f.name}: ${f.value}`)
-    ].filter(Boolean).join(' ');
 
-    const priceMatch = rawText.match(/(\d[\d,.]*)\s*(zcoin|adena|zc)/i);
-    if (priceMatch) {
-      const price = parseFloat(priceMatch[1].replace(/,/g, ''));
-      const currency = priceMatch[2].toLowerCase() === 'adena' ? 'Adena' : 'zCoin';
-      const name = (embed.title || embed.description || '')
-        .replace(/\d[\d,.]*\s*(zcoin|adena|zc)/gi, '')
-        .replace(/[-–:|]/g, '')
-        .trim();
-      if (name && price > 0) return { name, price, currency };
+    // Log embed structure to understand ZGaming format
+    console.log('[ZGaming Embed]', JSON.stringify({
+      title: embed.title,
+      description: embed.description?.slice(0, 150),
+      fields: embed.fields,
+    }, null, 2));
+
+    // 1. Item name from title (if not "Price")
+    let itemName = '';
+    if (embed.title && !/^\s*price\s*$/i.test(embed.title)) {
+      itemName = cleanEmojis(embed.title);
     }
 
-    // If embed has title and fields for price
-    if (embed.title) {
-      const priceField = embed.fields?.find((f: any) =>
-        /price|preco|valor|cost/i.test(f.name)
+    // 2. Item name from specific field
+    if (!itemName && embed.fields) {
+      const itemField = embed.fields.find((f: any) =>
+        /^(item|name|nome|produto|listing)$/i.test(f.name.trim())
+      );
+      if (itemField) itemName = cleanEmojis(itemField.value);
+    }
+
+    // 3. Item name from first line of description
+    if (!itemName && embed.description) {
+      itemName = cleanEmojis(embed.description.split('\n')[0]);
+    }
+
+    // 4. Price from "Price" field
+    let price = 0;
+    let currency = 'zCoin';
+    if (embed.fields) {
+      const priceField = embed.fields.find((f: any) =>
+        /price|preco|valor|cost|amount/i.test(f.name)
       );
       if (priceField) {
-        const pm = priceField.value.match(/(\d[\d,.]*)/);
+        const cleanVal = cleanEmojis(priceField.value);
+        const pm = cleanVal.match(/(\d[\d,.]*)/);
         if (pm) {
-          return {
-            name: embed.title.trim(),
-            price: parseFloat(pm[1].replace(/,/g, '')),
-            currency: priceField.value.toLowerCase().includes('adena') ? 'Adena' : 'zCoin',
-          };
+          price = parseFloat(pm[1].replace(/,/g, ''));
+          currency = priceField.value.toLowerCase().includes('adena') ? 'Adena' : 'zCoin';
         }
       }
     }
+
+    // 5. Price from full text fallback
+    if (!price) {
+      const fullText = cleanEmojis([
+        embed.title || '',
+        embed.description || '',
+        ...(embed.fields || []).map((f: any) => `${f.name} ${f.value}`)
+      ].join(' '));
+      const pm = fullText.match(/(\d[\d,.]+)/g);
+      if (pm) price = parseFloat(pm[pm.length - 1].replace(/,/g, ''));
+    }
+
+    if (itemName && price > 0) return { name: itemName, price, currency };
   }
 
-  // Try plain text
+  // Plain text fallback
   const text = msg.content || '';
   if (text) {
-    // Format: "Item Name - 100 zCoin" or "Item Name: 100 Adena"
     const match = text.match(/^(.+?)\s*[-:–]\s*(\d[\d,.]*)\s*(zcoin|adena|zc)/i);
     if (match) {
       return {
@@ -72,11 +102,9 @@ function parseMessage(msg: any): { name: string; price: number; currency: string
         currency: match[3].toLowerCase() === 'adena' ? 'Adena' : 'zCoin',
       };
     }
-
-    // Format: price anywhere in message
-    const pm = text.match(/(\d[\d,.]*)\s*(zcoin|adena|zc)/i);
+    const pm = text.match(/(\d[\d,.]*)\s*(zcoin|adena)/i);
     if (pm) {
-      const namePart = text.split(pm[0])[0].replace(/[-:,]$/, '').trim();
+      const namePart = cleanEmojis(text.split(pm[0])[0]).replace(/[-:,]$/, '').trim();
       if (namePart) {
         return {
           name: namePart,
@@ -154,7 +182,7 @@ async function pollMessages() {
             newCount++;
           }
         }
-      } catch {}
+      } catch { }
     }
 
     if (newCount > 0) {
