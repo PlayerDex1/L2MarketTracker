@@ -41,9 +41,11 @@ function parseMessage(msg: any): { name: string; price: number; currency: string
       fields: embed.fields,
     }, null, 2));
 
-    // 1. Item name from title (if not "Price")
+    // 1. Item name: author.name > title > field > description
     let itemName = '';
-    if (embed.title && !/^\s*price\s*$/i.test(embed.title)) {
+    if (embed.author?.name) {
+      itemName = cleanEmojis(embed.author.name);
+    } else if (embed.title && !/^\s*price\s*$/i.test(embed.title)) {
       itemName = cleanEmojis(embed.title);
     }
 

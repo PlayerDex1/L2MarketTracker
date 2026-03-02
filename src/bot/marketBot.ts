@@ -82,7 +82,6 @@ export function startMarketBot() {
         intents: [
             GatewayIntentBits.Guilds,
             GatewayIntentBits.GuildMessages,
-            GatewayIntentBits.MessageContent,
         ],
     });
 
