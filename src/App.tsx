@@ -15,6 +15,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import CreateClan from './pages/CreateClan';
 import Market from './pages/Market';
+import Watchlist from './pages/Watchlist';
 import { AuthProvider } from './contexts/AuthContext';
 import { ClanDataProvider } from './contexts/ClanDataContext';
 
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="cps" element={<ConstantParties />} />
               <Route path="applications" element={<Applications />} />
               <Route path="market" element={<Market />} />
+              <Route path="watchlist" element={<Watchlist />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>

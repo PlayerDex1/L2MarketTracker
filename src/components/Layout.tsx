@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
-import { Shield, Users, Calendar, LogOut, Menu, Swords, UserPlus, Settings as SettingsIcon, ShoppingCart } from 'lucide-react';
+import { Shield, Users, Calendar, LogOut, Menu, Swords, UserPlus, Settings as SettingsIcon, ShoppingCart, Bell } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +28,7 @@ export default function Layout() {
     { name: 'CP Management', href: '/cps', icon: Swords },
     { name: 'Recruitment', href: '/applications', icon: UserPlus },
     { name: 'Market Tracker', href: '/market', icon: ShoppingCart },
+    { name: 'Watchlist', href: '/watchlist', icon: Bell },
     { name: 'Settings', href: '/settings', icon: SettingsIcon },
   ];
 
@@ -39,7 +40,7 @@ export default function Layout() {
           <Shield className="w-8 h-8 text-indigo-500" />
           <span className="font-bold text-xl tracking-tight truncate">{clan.name}</span>
         </div>
-        
+
         <nav className="flex-1 px-4 py-6 space-y-1">
           <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4 px-3 mt-2">
             Clan Management
@@ -52,8 +53,8 @@ export default function Layout() {
                 to={item.href}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
-                  isActive 
-                    ? "bg-indigo-500/10 text-indigo-400" 
+                  isActive
+                    ? "bg-indigo-500/10 text-indigo-400"
                     : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
                 )}
               >
@@ -65,7 +66,7 @@ export default function Layout() {
         </nav>
 
         <div className="p-4 border-t border-zinc-800">
-          <button 
+          <button
             onClick={signOut}
             className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors"
           >
