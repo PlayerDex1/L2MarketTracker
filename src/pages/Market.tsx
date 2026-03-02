@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, ShoppingCart, Clock, ArrowUpDown, Filter, Bell, BellOff, Plus, X, Zap, Trash2 } from 'lucide-react';
+import { Search, Clock, ArrowUpDown, Filter, Bell, BellOff, Plus, X, Zap, Trash2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface MarketItem {
   id: string;
@@ -18,7 +19,7 @@ interface MarketAlert {
   created_at: string;
 }
 
-const POLL_INTERVAL = 10000; // 10 seconds
+const POLL_INTERVAL = 5000; // 5 seconds
 
 export default function Market() {
   const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
@@ -36,13 +37,23 @@ export default function Market() {
   const [newKeyword, setNewKeyword] = useState('');
   const [alertsModalOpen, setAlertsModalOpen] = useState(false);
 
-  // Fetch market items from API
+  // Fetch market items from Supabase
   const fetchItems = useCallback(async () => {
     try {
-      const res = await fetch('/api/market/items');
-      if (res.ok) {
-        const data = await res.json();
-        setMarketItems(data);
+      const { data, error } = await supabase
+        .from('market_items')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100);
+      if (!error && data) {
+        setMarketItems(data.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          price: d.price,
+          currency: d.currency,
+          timestamp: d.timestamp,
+          iconUrl: d.icon_url || '',
+        })));
         setBotConnected(true);
         setLastUpdate(new Date());
       }
@@ -53,11 +64,11 @@ export default function Market() {
     }
   }, []);
 
-  // Fetch alerts
+  // Alerts stored in localStorage (no backend needed)
   const fetchAlerts = useCallback(async () => {
     try {
-      const res = await fetch('/api/market/alerts');
-      if (res.ok) setAlerts(await res.json());
+      const saved = localStorage.getItem('market_alerts');
+      if (saved) setAlerts(JSON.parse(saved));
     } catch { }
   }, []);
 
@@ -68,36 +79,32 @@ export default function Market() {
     return () => clearInterval(interval);
   }, [fetchItems, fetchAlerts]);
 
-  const handleAddAlert = async (e: React.FormEvent) => {
+  const saveAlerts = (updated: MarketAlert[]) => {
+    setAlerts(updated);
+    localStorage.setItem('market_alerts', JSON.stringify(updated));
+  };
+
+  const handleAddAlert = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newKeyword.trim()) return;
-    try {
-      const res = await fetch('/api/market/alerts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: newKeyword.trim() }),
-      });
-      if (res.ok) {
-        const { alert } = await res.json();
-        setAlerts(prev => [...prev, alert]);
-        setNewKeyword('');
-        setIsAlertModalOpen(false);
-      }
-    } catch { }
+    const alert: MarketAlert = {
+      id: `alert_${Date.now()}`,
+      keyword: newKeyword.trim(),
+      triggered: false,
+      lastMatch: null,
+      created_at: new Date().toISOString(),
+    };
+    saveAlerts([...alerts, alert]);
+    setNewKeyword('');
+    setIsAlertModalOpen(false);
   };
 
-  const handleDeleteAlert = async (alertId: string) => {
-    try {
-      await fetch(`/api/market/alerts/${alertId}`, { method: 'DELETE' });
-      setAlerts(prev => prev.filter(a => a.id !== alertId));
-    } catch { }
+  const handleDeleteAlert = (alertId: string) => {
+    saveAlerts(alerts.filter(a => a.id !== alertId));
   };
 
-  const handleDismissAlert = async (alertId: string) => {
-    try {
-      await fetch(`/api/market/alerts/${alertId}/seen`, { method: 'PATCH' });
-      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, triggered: false, lastMatch: null } : a));
-    } catch { }
+  const handleDismissAlert = (alertId: string) => {
+    saveAlerts(alerts.map(a => a.id === alertId ? { ...a, triggered: false, lastMatch: null } : a));
   };
 
   const handleSort = (key: string) => {

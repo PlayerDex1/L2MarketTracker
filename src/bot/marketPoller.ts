@@ -1,9 +1,13 @@
 import 'dotenv/config';
+import { createClient } from '@supabase/supabase-js';
 
 const USER_TOKEN = process.env.DISCORD_USER_TOKEN || '';
 const CHANNEL_ID = process.env.ZGAMING_MARKET_CHANNEL_ID || '';
-const API_URL = 'http://localhost:3000/api/market/items';
-const POLL_INTERVAL_MS = 15000; // 15 seconds
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://mgylypvmgjebvpxhlmly.supabase.co';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_RG-4on-iquEBjcvHD-ZAMw_SqZTkHTS';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const POLL_INTERVAL_MS = 15000;
 
 let lastMessageId: string | null = null;
 
@@ -176,17 +180,20 @@ async function pollMessages() {
       };
 
       try {
-        const postRes = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item),
-        });
-        if (postRes.ok) {
-          const body = await postRes.json();
-          if (!body.duplicate) {
-            console.log(`📦 Market item: ${parsed.name} — ${parsed.price} ${parsed.currency}`);
-            newCount++;
-          }
+        const { error } = await supabase.from('market_items').upsert({
+          id: msg.id,
+          name: parsed.name,
+          price: parsed.price,
+          currency: parsed.currency,
+          timestamp: msg.timestamp,
+          icon_url: guessIconUrl(parsed.name),
+        }, { onConflict: 'id' });
+
+        if (!error) {
+          console.log(`📦 Market item: ${parsed.name} — ${parsed.price} ${parsed.currency}`);
+          newCount++;
+        } else if (error.code !== '23505') { // ignore duplicate key
+          console.error('Supabase error:', error.message);
         }
       } catch { }
     }
