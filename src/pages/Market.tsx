@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Clock, ArrowUpDown, Filter, Bell, BellOff, Plus, X, Zap, Trash2, DollarSign, TrendingUp, BarChart2, ChevronRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabase';
@@ -84,25 +84,23 @@ export default function Market() {
   const [chartData, setChartData] = useState<{ time: string; price: number }[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
 
-  // Stable icon cache via useRef — persists first seen icon per name without triggering re-renders
-  const iconCache = useRef<Record<string, string>>({});
-
   // Ranking: top N items by listing count
   const ranking = useMemo(() => {
-    const counts: Record<string, { count: number; prices: number[] }> = {};
+    const counts: Record<string, { count: number; avgPrice: number; icon: string; prices: number[] }> = {};
     marketItems.forEach(item => {
       const key = normalizeItemName(item.name);
-      if (!iconCache.current[key] && item.iconUrl) iconCache.current[key] = item.iconUrl;
-      if (!counts[key]) counts[key] = { count: 0, prices: [] };
+      if (!counts[key]) counts[key] = { count: 0, avgPrice: 0, icon: item.iconUrl, prices: [] };
       counts[key].count++;
       counts[key].prices.push(item.price);
+      // icon is set only once on first occurrence — prevents flicker on re-render
     });
     return Object.entries(counts)
       .map(([name, v]) => ({
         name,
         count: v.count,
+        avgPrice: Math.round(v.prices.reduce((a, b) => a + b, 0) / v.prices.length),
         minPrice: Math.min(...v.prices),
-        icon: iconCache.current[name] || '',
+        icon: v.icon,
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
