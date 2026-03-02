@@ -358,9 +358,13 @@ app.patch('/api/market/alerts/:alertId/seen', (req, res) => {
   res.json({ success: true });
 });
 
-// Catch-all for API routes to prevent HTML 404s
-app.use((req, res) => {
-  res.status(404).json({ error: `API Route not found: ${req.method} ${req.url}` });
+// Catch-all: só intercepta rotas /api/* — deixa o resto para o Vite
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ error: `API Route not found: ${req.method} ${req.url}` });
+  } else {
+    next();
+  }
 });
 
 export default app;
