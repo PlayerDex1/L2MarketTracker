@@ -1,7 +1,8 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { TrendingUp, Bell, BarChart2, Zap, Search, LineChart } from 'lucide-react';
+import { TrendingUp, Bell, BarChart2, Zap, Search, LineChart, LogOut, LogIn } from 'lucide-react';
 import CommandPalette from './CommandPalette';
+import { useAuth } from '../lib/AuthContext';
 
 const NAV = [
   { name: 'Live Market', href: '/', icon: TrendingUp },
@@ -12,6 +13,7 @@ const NAV = [
 export default function Layout() {
   const { pathname } = useLocation();
   const [cmdOpen, setCmdOpen] = useState(false);
+  const { user, signInWithDiscord, signOut, loading } = useAuth();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -69,6 +71,28 @@ export default function Layout() {
               );
             })}
           </nav>
+
+          {/* User / Login */}
+          <div className="flex items-center ml-2 border-l border-zinc-800/60 pl-4 shrink-0">
+            {loading ? (
+              <div className="w-8 h-8 rounded-full bg-zinc-800 animate-pulse"></div>
+            ) : user ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <img src={user.user_metadata.avatar_url || `https://ui-avatars.com/api/?name=${user.email}`} alt="Avatar" className="w-8 h-8 rounded-full border border-zinc-700" />
+                  <span className="text-sm font-medium hidden md:inline">{user.user_metadata.custom_claims?.global_name || user.email?.split('@')[0]}</span>
+                </div>
+                <button onClick={signOut} title="Sair" className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button onClick={signInWithDiscord} className="flex items-center gap-2 px-3 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-lg text-sm font-semibold transition-colors">
+                <LogIn className="w-4 h-4" />
+                <span className="hidden sm:inline">Login Discord</span>
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

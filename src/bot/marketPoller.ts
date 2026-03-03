@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import { startTelegramBot, sendTelegramNotification } from './telegramBot.js';
+import { sendDiscordDM } from './discordNotifier.js';
 
 const USER_TOKEN = process.env.DISCORD_USER_TOKEN || '';
 const CHANNEL_ID = process.env.ZGAMING_MARKET_CHANNEL_ID || '';
@@ -136,6 +136,45 @@ function parseMessage(msg: any): { name: string; price: number; currency: string
   return null;
 }
 
+export async function sendDiscordNotification(name: string, price: number, currency: string, timestamp: string, iconUrl?: string) {
+  try {
+    const { data: alerts } = await supabase.from('user_alerts').select('*');
+    if (!alerts || alerts.length === 0) return;
+
+    for (const alert of alerts) {
+      let matched = false;
+
+      if (name.toLowerCase().includes(alert.keyword.toLowerCase())) {
+        const maxPrice = alert.max_price;
+        const minEnhancement = alert.min_enhancement;
+        let priceOk = true;
+        let enhanceOk = true;
+
+        if (maxPrice && price > maxPrice) priceOk = false;
+        if (minEnhancement) {
+          const m = name.match(/\+(\d+)/);
+          if ((m ? parseInt(m[1]) : 0) < minEnhancement) enhanceOk = false;
+        }
+
+        matched = priceOk && enhanceOk;
+      }
+
+      if (matched && alert.discord_id) {
+        const urlName = encodeURIComponent(name);
+        const message = `🔔 **ZB MARKET MATCH**\n\n` +
+          `📦 **${name}**\n` +
+          `💰 **${price.toLocaleString()} ${currency}**\n\n` +
+          `🔎 Motivo: Match no alerta "${alert.keyword}"\n` +
+          `Ver: https://zgaming-market-tracker.vercel.app/item/${urlName}`;
+
+        await sendDiscordDM(alert.discord_id, message);
+      }
+    }
+  } catch (e) {
+    console.error('Erro ao processar notificações do Discord:', e);
+  }
+}
+
 async function pollMessages() {
   if (!USER_TOKEN || !CHANNEL_ID) return;
 
@@ -200,8 +239,8 @@ async function pollMessages() {
         if (!error) {
           console.log(`📦 Market item: ${parsed.name} — ${parsed.price} ${parsed.currency}`);
           newCount++;
-          // Telegram notification
-          await sendTelegramNotification(parsed.name, parsed.price, parsed.currency, msg.timestamp);
+          // Discord notification
+          await sendDiscordNotification(parsed.name, parsed.price, parsed.currency, msg.timestamp, parsed.iconUrl);
         } else if (error.code !== '23505') { // ignore duplicate key
           console.error('Supabase error:', error.message);
         }
@@ -228,9 +267,6 @@ export function startMarketPoller() {
   }
 
   console.log(`🔄 ZGaming Market Poller started (every ${POLL_INTERVAL_MS / 1000}s) — Channel: ${CHANNEL_ID}`);
-
-  // Start Telegram bot alongside poller
-  startTelegramBot();
 
   // First poll immediately, then every 5s
   pollMessages();

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Clock, ArrowUpDown, Filter, Bell, Plus, X, Zap, Trash2, DollarSign, TrendingUp, ChevronRight, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/AuthContext';
 
 interface MarketItem {
     id: string;
@@ -17,9 +18,11 @@ interface MarketAlert {
     keyword: string;
     maxPrice?: number;
     minEnhancement?: number;
-    triggered: boolean;
-    lastMatch: MarketItem | null;
-    history: MarketItem[];
+    max_price?: number;
+    min_enhancement?: number;
+    triggered?: boolean;
+    lastMatch?: MarketItem | null;
+    history?: MarketItem[];
     created_at: string;
 }
 
@@ -43,10 +46,12 @@ function fireNotification(item: MarketItem, alert: MarketAlert) {
 
 function itemMatchesAlert(item: MarketItem, alert: MarketAlert): boolean {
     if (!item.name.toLowerCase().includes(alert.keyword.toLowerCase())) return false;
-    if (alert.maxPrice !== undefined && item.price > alert.maxPrice) return false;
-    if (alert.minEnhancement !== undefined) {
+    const maxP = alert.maxPrice ?? alert.max_price;
+    const minE = alert.minEnhancement ?? alert.min_enhancement;
+    if (maxP !== undefined && maxP !== null && item.price > maxP) return false;
+    if (minE !== undefined && minE !== null) {
         const m = item.name.match(/\+(\d+)/);
-        if ((m ? parseInt(m[1]) : 0) < alert.minEnhancement) return false;
+        if ((m ? parseInt(m[1]) : 0) < minE) return false;
     }
     return true;
 }
@@ -70,6 +75,8 @@ function formatTime(iso: string) {
 
 export default function MarketHome() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const { user, signInWithDiscord } = useAuth();
     const [items, setItems] = useState<MarketItem[]>([]);
     const [alerts, setAlerts] = useState<MarketAlert[]>([]);
     const [loading, setLoading] = useState(true);
@@ -94,13 +101,28 @@ export default function MarketHome() {
         setLoading(false);
     }, []);
 
-    const loadAlerts = useCallback(() => {
-        try { const s = localStorage.getItem('market_alerts'); if (s) setAlerts(JSON.parse(s)); } catch { }
-    }, []);
+    const loadAlerts = useCallback(async () => {
+        if (!user) {
+            setAlerts([]);
+            return;
+        }
+        const { data } = await supabase.from('user_alerts').select('*').order('created_at', { ascending: false });
+        if (data) {
+            setAlerts(data.map((a: any) => ({ ...a, triggered: false, lastMatch: null, history: [] })));
+        }
+    }, [user]);
 
-    const saveAlerts = (updated: MarketAlert[]) => {
+    useEffect(() => {
+        const queryAlert = searchParams.get('alert');
+        if (queryAlert && user) {
+            setNewKeyword(queryAlert);
+            setAlertModal(true);
+        }
+    }, [searchParams, user]);
+
+    // Local updates for UI
+    const updateAlertState = (updated: MarketAlert[]) => {
         setAlerts(updated);
-        localStorage.setItem('market_alerts', JSON.stringify(updated));
     };
 
     useEffect(() => {
@@ -116,7 +138,6 @@ export default function MarketHome() {
                     const updated = cur.map(a => itemMatchesAlert(newItem, a)
                         ? (fireNotification(newItem, a), { ...a, triggered: true, lastMatch: newItem, history: [newItem, ...(a.history || [])].slice(0, 20) })
                         : a);
-                    localStorage.setItem('market_alerts', JSON.stringify(updated));
                     return updated;
                 });
             }).subscribe();
@@ -125,15 +146,26 @@ export default function MarketHome() {
 
     const handleAddAlert = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!user) {
+            signInWithDiscord();
+            return;
+        }
         if (!newKeyword.trim()) return;
-        await requestNotificationPermission();
-        const alert: MarketAlert = {
-            id: `alert_${Date.now()}`, keyword: newKeyword.trim(),
-            maxPrice: newMaxPrice ? parseFloat(newMaxPrice) : undefined,
-            minEnhancement: newMinEnhancement ? parseInt(newMinEnhancement) : undefined,
-            triggered: false, lastMatch: null, history: [], created_at: new Date().toISOString(),
-        };
-        saveAlerts([...alerts, alert]);
+        requestNotificationPermission(); // dont await, just request
+
+        const discord_id = user.user_metadata?.provider_id || user.user_metadata?.sub || '';
+
+        const { data, error } = await supabase.from('user_alerts').insert({
+            user_id: user.id,
+            discord_id,
+            keyword: newKeyword.trim(),
+            max_price: newMaxPrice ? parseFloat(newMaxPrice) : null,
+            min_enhancement: newMinEnhancement ? parseInt(newMinEnhancement) : null,
+        }).select().single();
+
+        if (data) {
+            updateAlertState([{ ...data, triggered: false, lastMatch: null, history: [] }, ...alerts]);
+        }
         setNewKeyword(''); setNewMaxPrice(''); setNewMinEnhancement(''); setAlertModal(false);
     };
 
@@ -182,7 +214,7 @@ export default function MarketHome() {
                         {live ? 'LIVE' : 'Offline'}
                         {lastUpdate && <span className="text-zinc-500 font-normal hidden sm:inline">· {formatTime(lastUpdate.toISOString())}</span>}
                     </div>
-                    <button onClick={() => setAlertModal(true)}
+                    <button onClick={() => user ? setAlertModal(true) : signInWithDiscord()}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">
                         <Bell className="w-3.5 h-3.5" /> Novo Alerta
                     </button>
@@ -215,12 +247,12 @@ export default function MarketHome() {
                         <Zap className="w-4 h-4 text-amber-400 shrink-0" />
                         <div>
                             <p className="text-sm font-semibold text-amber-300">
-                                "{alert.keyword}" {alert.maxPrice && `≤ ${alert.maxPrice} zCoin`} {alert.minEnhancement && `+${alert.minEnhancement}+`}
+                                "{alert.keyword}" {(alert.maxPrice || alert.max_price) && `≤ ${alert.maxPrice || alert.max_price} zCoin`} {(alert.minEnhancement || alert.min_enhancement) && `+${alert.minEnhancement || alert.min_enhancement}+`}
                             </p>
                             {alert.lastMatch && <p className="text-xs text-zinc-400">{alert.lastMatch.name} — {alert.lastMatch.price} {alert.lastMatch.currency}</p>}
                         </div>
                     </div>
-                    <button onClick={() => saveAlerts(alerts.map(a => a.id === alert.id ? { ...a, triggered: false, lastMatch: null } : a))} className="text-zinc-500 hover:text-zinc-300">
+                    <button onClick={() => updateAlertState(alerts.map(a => a.id === alert.id ? { ...a, triggered: false, lastMatch: null } : a))} className="text-zinc-500 hover:text-zinc-300">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -297,7 +329,7 @@ export default function MarketHome() {
                                                 <div className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatTime(item.timestamp)}</div>
                                             </td>
                                             <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-                                                <button onClick={() => { setNewKeyword(normalizeItemName(item.name)); setAlertModal(true); }}
+                                                <button onClick={() => { if (!user) { signInWithDiscord(); return; } setNewKeyword(normalizeItemName(item.name)); setAlertModal(true); }}
                                                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${matched ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400'}`}>
                                                     <Bell className="w-3 h-3" />{matched ? 'Watching' : 'Alert'}
                                                 </button>

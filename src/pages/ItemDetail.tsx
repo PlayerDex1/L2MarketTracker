@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, TrendingDown, TrendingUp, BarChart2, Bell } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/AuthContext';
 
 interface HistoryItem {
     id: string;
@@ -21,6 +22,7 @@ function extractQuantity(name: string) {
 export default function ItemDetail() {
     const { name } = useParams<{ name: string }>();
     const navigate = useNavigate();
+    const { user, signInWithDiscord } = useAuth();
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -76,7 +78,7 @@ export default function ItemDetail() {
                     <p className="text-sm text-zinc-500">{history.length} listagem(ns) encontrada(s)</p>
                 </div>
                 <div className="ml-auto">
-                    <button onClick={() => navigate(`/?alert=${encodeURIComponent(name || '')}`)}
+                    <button onClick={() => user ? navigate(`/?alert=${encodeURIComponent(name || '')}`) : signInWithDiscord()}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors">
                         <Bell className="w-3.5 h-3.5" /> Criar Alerta
                     </button>
