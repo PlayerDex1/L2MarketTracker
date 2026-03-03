@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, BellOff, Trash2, Clock, Plus, X, Zap, History } from 'lucide-react';
+import { Bell, BellOff, Trash2, Clock, Plus, X, Zap, History, Send, CheckCircle } from 'lucide-react';
 
 interface MarketItem {
     id: string;
@@ -24,23 +24,37 @@ interface MarketAlert {
 export default function Watchlist() {
     const [alerts, setAlerts] = useState<MarketAlert[]>([]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [telegramId, setTelegramId] = useState('');
+    const [telegramConnected, setTelegramConnected] = useState(false);
+    const [telegramInput, setTelegramInput] = useState('');
 
     useEffect(() => {
         try {
             const saved = localStorage.getItem('market_alerts');
             if (saved) setAlerts(JSON.parse(saved));
+            const tgId = localStorage.getItem('telegram_chat_id');
+            if (tgId) { setTelegramId(tgId); setTelegramConnected(true); setTelegramInput(tgId); }
         } catch { }
-
-        // Poll localStorage every 5s for updates from Market page
         const interval = setInterval(() => {
             try {
                 const saved = localStorage.getItem('market_alerts');
                 if (saved) setAlerts(JSON.parse(saved));
             } catch { }
         }, 5000);
-
         return () => clearInterval(interval);
     }, []);
+
+    const connectTelegram = () => {
+        const id = telegramInput.trim();
+        if (!id) return;
+        localStorage.setItem('telegram_chat_id', id);
+        setTelegramId(id); setTelegramConnected(true);
+    };
+
+    const disconnectTelegram = () => {
+        localStorage.removeItem('telegram_chat_id');
+        setTelegramId(''); setTelegramConnected(false); setTelegramInput('');
+    };
 
     const saveAlerts = (updated: MarketAlert[]) => {
         setAlerts(updated);
@@ -61,17 +75,17 @@ export default function Watchlist() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-zinc-100">Watchlist</h1>
-                    <p className="text-zinc-400 mt-1">Seus alertas de mercado e histórico de matches.</p>
+                    <h1 className="text-2xl font-bold text-zinc-100">Watchlist</h1>
+                    <p className="text-zinc-500 text-sm mt-0.5">Seus alertas e histórico de matches.</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     {triggeredCount > 0 && (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm font-medium text-amber-400">
                             <Zap className="w-4 h-4" />
                             {triggeredCount} alerta(s) ativo(s)
                         </div>
                     )}
-                    <a href="/market"
+                    <a href="/"
                         className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
                         <Plus className="w-4 h-4" /> Novo Alerta
                     </a>
@@ -192,6 +206,43 @@ export default function Watchlist() {
                     ))}
                 </div>
             )}
+
+            {/* Telegram connection */}
+            <div className={`border rounded-xl p-5 ${telegramConnected ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                <div className="flex items-center gap-3 mb-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${telegramConnected ? 'bg-emerald-500/10' : 'bg-zinc-800'}`}>
+                        <Send className={`w-4 h-4 ${telegramConnected ? 'text-emerald-400' : 'text-zinc-400'}`} />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-zinc-100 text-sm">Notificações no Telegram</h3>
+                        <p className="text-xs text-zinc-500">{telegramConnected ? `Conectado · ID ${telegramId}` : 'Receba alertas direto no celular'}</p>
+                    </div>
+                    {telegramConnected && <CheckCircle className="w-4 h-4 text-emerald-400 ml-auto" />}
+                </div>
+
+                {!telegramConnected ? (
+                    <div className="space-y-3">
+                        <div className="text-xs text-zinc-400 bg-zinc-950 border border-zinc-800 rounded-lg p-3 space-y-1">
+                            <p>1. Abra o Telegram e inicie uma conversa com <span className="text-indigo-400 font-mono">@ZGamingMarketBot</span></p>
+                            <p>2. Envie o comando <span className="font-mono text-zinc-300">/start</span></p>
+                            <p>3. O bot vai te enviar seu <strong className="text-zinc-200">Chat ID</strong> — cole abaixo</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <input type="text" value={telegramInput} onChange={e => setTelegramInput(e.target.value)}
+                                placeholder="Cole seu Chat ID aqui..."
+                                className="flex-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                            <button onClick={connectTelegram} disabled={!telegramInput.trim()}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-colors">
+                                Conectar
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <button onClick={disconnectTelegram} className="text-xs text-zinc-500 hover:text-red-400 transition-colors">
+                        Desconectar Telegram
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
