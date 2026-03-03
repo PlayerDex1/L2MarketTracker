@@ -13,6 +13,11 @@ interface HistoryItem {
     iconUrl: string;
 }
 
+function extractQuantity(name: string) {
+    const match = name.match(/\[\s*(\d+)\s*pcs\.?\]/i) || name.match(/\bx\s*(\d+)\b/i) || name.match(/\b(\d+)\s*x\b/i);
+    return match ? parseInt(match[1], 10) : 1;
+}
+
 export default function ItemDetail() {
     const { name } = useParams<{ name: string }>();
     const navigate = useNavigate();
@@ -150,7 +155,16 @@ export default function ItemDetail() {
                                             <span className={`font-medium ${item.name.includes('+') ? 'text-amber-400' : 'text-zinc-200'}`}>{item.name}</span>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-2.5 font-bold text-amber-500">{item.price.toLocaleString()} {item.currency}</td>
+                                    <td className="px-4 py-2.5">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-amber-500">{item.price.toLocaleString()} {item.currency}</span>
+                                            {extractQuantity(item.name) > 1 && (
+                                                <span className="text-[10px] text-zinc-500">
+                                                    {extractQuantity(item.name)}x • {(item.price / extractQuantity(item.name)).toLocaleString(undefined, { maximumFractionDigits: 1 })} {item.currency}/un
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="px-4 py-2.5 text-zinc-500 text-xs">{formatTime(item.timestamp)}</td>
                                 </tr>
                             ))}
