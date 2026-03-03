@@ -32,6 +32,8 @@ async function handleUpdate(update: any) {
         await supabase.from('telegram_subscriptions').upsert({ chat_id: chatId, username }, { onConflict: 'chat_id' });
         await sendMessage(chatId,
             `🎮 *Bem-vindo ao ZGaming Market Bot!*\n\n` +
+            `📋 *Seu Chat ID:* \`${chatId}\`\n` +
+            `_Copie este ID e cole na Watchlist do site para conectar notificações._\n\n` +
             `Use os comandos abaixo:\n\n` +
             `📌 */watch <item>* — Monitorar item\n` +
             `📌 */watch <item> max:<preço>* — Com preço máximo\n` +
@@ -207,7 +209,7 @@ export async function sendTelegramNotification(itemName: string, price: number, 
                 `🎯 Alerta: \`${alert.keyword}\`` +
                 (alert.max_price ? ` ≤ ${alert.max_price} zCoin` : '') +
                 (alert.min_enhancement ? ` +${alert.min_enhancement}+` : '') +
-                `\n\n👉 [Ver no Market](https://gerencimanento-de-clan.vercel.app/market)`;
+                `\n\n👉 [Ver no Market](https://gerencimanento-de-clan.vercel.app/)`;
 
             await fetch(`${API}/sendMessage`, {
                 method: 'POST',
