@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Clock, ArrowUpDown, Filter, Bell, Plus, X, Zap, Trash2, DollarSign, TrendingUp, ChevronRight, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
+import { useServer } from '../lib/ServerContext';
 
 interface MarketItem {
     id: string;
@@ -77,6 +78,7 @@ export default function MarketHome() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { user, signInWithDiscord } = useAuth();
+    const { activeServer } = useServer();
     const [items, setItems] = useState<MarketItem[]>([]);
     const [alerts, setAlerts] = useState<MarketAlert[]>([]);
     const [loading, setLoading] = useState(true);
@@ -131,6 +133,7 @@ export default function MarketHome() {
         const channel = supabase.channel('market_realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'market_items' }, (payload) => {
                 const d = payload.new as any;
+                if (d.server_id !== activeServer) return; // ignora items de outros servidores no painel live
                 const newItem: MarketItem = { id: d.id, name: d.name, price: d.price, currency: d.currency, timestamp: d.timestamp, iconUrl: d.icon_url || '' };
                 setItems(prev => prev.some(i => i.id === newItem.id) ? prev : [newItem, ...prev].slice(0, 100));
                 setLive(true); setLastUpdate(new Date());
@@ -142,7 +145,7 @@ export default function MarketHome() {
                 });
             }).subscribe();
         return () => { clearInterval(interval); supabase.removeChannel(channel); };
-    }, [fetchItems, loadAlerts]);
+    }, [fetchItems, loadAlerts, activeServer]);
 
     const handleAddAlert = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -158,6 +161,7 @@ export default function MarketHome() {
         const { data, error } = await supabase.from('user_alerts').insert({
             user_id: user.id,
             discord_id,
+            server_id: activeServer,
             keyword: newKeyword.trim(),
             max_price: newMaxPrice ? parseFloat(newMaxPrice) : null,
             min_enhancement: newMinEnhancement ? parseInt(newMinEnhancement) : null,

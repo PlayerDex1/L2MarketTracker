@@ -1,16 +1,17 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import { sendDiscordDM } from './discordNotifier.js';
+import { sendDiscordDM } from './discordNotifier';
+import { SERVERS } from '../config/servers';
 
 const USER_TOKEN = process.env.DISCORD_USER_TOKEN || '';
-const CHANNEL_ID = process.env.ZGAMING_MARKET_CHANNEL_ID || '';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://mgylypvmgjebvpxhlmly.supabase.co';
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_RG-4on-iquEBjcvHD-ZAMw_SqZTkHTS';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const POLL_INTERVAL_MS = 5000; // 5 seconds
 
-let lastMessageId: string | null = null;
+// Armazena o state do ultimo ID lido por servidor { 'zgaming': '123..', 'pride': '456..' }
+let lastMessageIds: Record<string, string | null> = {};
 
 function guessIconUrl(itemName: string): string {
   const name = itemName.toLowerCase();
@@ -136,9 +137,9 @@ function parseMessage(msg: any): { name: string; price: number; currency: string
   return null;
 }
 
-export async function sendDiscordNotification(name: string, price: number, currency: string, timestamp: string, iconUrl?: string) {
+export async function sendDiscordNotification(serverId: string, name: string, price: number, currency: string, timestamp: string, iconUrl?: string) {
   try {
-    const { data: alerts } = await supabase.from('user_alerts').select('*');
+    const { data: alerts } = await supabase.from('user_alerts').select('*').eq('server_id', serverId);
     if (!alerts || alerts.length === 0) return;
 
     for (const alert of alerts) {
@@ -160,8 +161,9 @@ export async function sendDiscordNotification(name: string, price: number, curre
       }
 
       if (matched && alert.discord_id) {
+        const serverTag = serverId.toUpperCase();
         const urlName = encodeURIComponent(name);
-        const message = `🔔 **ZB MARKET MATCH**\n\n` +
+        const message = `🔔 **L2 MARKET MATCH [${serverTag}]**\n\n` +
           `📦 **${name}**\n` +
           `💰 **${price.toLocaleString()} ${currency}**\n\n` +
           `🔎 Motivo: Match no alerta "${alert.keyword}"\n` +
@@ -175,10 +177,11 @@ export async function sendDiscordNotification(name: string, price: number, curre
   }
 }
 
-async function pollMessages() {
-  if (!USER_TOKEN || !CHANNEL_ID) return;
+async function pollMessagesForServer(server: { id: string, channelId: string, name: string }) {
+  if (!USER_TOKEN) return;
 
-  const url = `https://discord.com/api/v10/channels/${CHANNEL_ID}/messages?limit=20${lastMessageId ? `&after=${lastMessageId}` : ''}`;
+  const lastId = lastMessageIds[server.id];
+  const url = `https://discord.com/api/v10/channels/${server.channelId}/messages?limit=20${lastId ? `&after=${lastId}` : ''}`;
 
   try {
     const res = await fetch(url, {
@@ -190,11 +193,11 @@ async function pollMessages() {
 
     if (!res.ok) {
       if (res.status === 401) {
-        console.error('❌ ZGaming Poller: Invalid user token (401). Check DISCORD_USER_TOKEN in .env');
+        console.error('❌ L2 Poller: Invalid user token (401). Check DISCORD_USER_TOKEN in .env');
       } else if (res.status === 403) {
-        console.error('❌ ZGaming Poller: No access to channel (403). Make sure you are a member of the ZGaming server.');
+        console.error(`❌ L2 Poller: No access to channel (403). Cannot access ${server.name} channel.`);
       } else {
-        console.error(`❌ ZGaming Poller: Discord API error ${res.status}`);
+        console.error(`❌ L2 Poller: Discord API error ${res.status} on ${server.name}`);
       }
       return;
     }
@@ -207,7 +210,7 @@ async function pollMessages() {
     const sorted = [...messages].reverse();
 
     // Update lastMessageId to the newest message
-    lastMessageId = messages[0].id;
+    lastMessageIds[server.id] = messages[0].id;
 
     let newCount = 0;
     for (const msg of sorted) {
@@ -224,6 +227,7 @@ async function pollMessages() {
         timestamp: msg.timestamp,
         iconUrl: guessIconUrl(parsed.name),
         messageId: msg.id,
+        server_id: server.id
       };
 
       try {
@@ -234,13 +238,14 @@ async function pollMessages() {
           currency: parsed.currency,
           timestamp: msg.timestamp,
           icon_url: parsed.iconUrl || guessIconUrl(parsed.name),
+          server_id: server.id
         }, { onConflict: 'id' });
 
         if (!error) {
-          console.log(`📦 Market item: ${parsed.name} — ${parsed.price} ${parsed.currency}`);
+          console.log(`📦 Market item [${server.name}]: ${parsed.name} — ${parsed.price} ${parsed.currency}`);
           newCount++;
           // Discord notification
-          await sendDiscordNotification(parsed.name, parsed.price, parsed.currency, msg.timestamp, parsed.iconUrl);
+          await sendDiscordNotification(server.id, parsed.name, parsed.price, parsed.currency, msg.timestamp, parsed.iconUrl);
         } else if (error.code !== '23505') { // ignore duplicate key
           console.error('Supabase error:', error.message);
         }
@@ -248,29 +253,50 @@ async function pollMessages() {
     }
 
     if (newCount > 0) {
-      console.log(`✅ ZGaming Poller: ${newCount} new item(s) captured`);
+      console.log(`✅ L2 Poller: ${newCount} new item(s) captured from ${server.name}`);
     }
 
   } catch (err: any) {
-    console.error('❌ ZGaming Poller fetch error:', err.message);
+    console.error(`❌ L2 Poller fetch error on ${server.name}:`, err.message);
+  }
+}
+
+async function pollAll() {
+  const activeBots = SERVERS.filter(s => {
+    if (s.id === 'zgaming') return !!process.env.ZGAMING_MARKET_CHANNEL_ID;
+    if (s.id === 'pride') return !!process.env.PRIDE_MARKET_CHANNEL_ID;
+    return false;
+  });
+
+  for (const bot of activeBots) {
+    const channelId = bot.id === 'zgaming' ? process.env.ZGAMING_MARKET_CHANNEL_ID : process.env.PRIDE_MARKET_CHANNEL_ID;
+    await pollMessagesForServer({ ...bot, channelId: channelId as string });
   }
 }
 
 export function startMarketPoller() {
   if (!USER_TOKEN) {
-    console.warn('⚠️  DISCORD_USER_TOKEN not set — ZGaming Market Poller disabled.');
-    return;
-  }
-  if (!CHANNEL_ID) {
-    console.warn('⚠️  ZGAMING_MARKET_CHANNEL_ID not set — ZGaming Market Poller disabled.');
+    console.warn('⚠️  DISCORD_USER_TOKEN não definido. L2 Market Poller desativado.');
     return;
   }
 
-  console.log(`🔄 ZGaming Market Poller started (every ${POLL_INTERVAL_MS / 1000}s) — Channel: ${CHANNEL_ID}`);
+  const activeBots = SERVERS.filter(s => {
+    if (s.id === 'zgaming') return !!process.env.ZGAMING_MARKET_CHANNEL_ID;
+    if (s.id === 'pride') return !!process.env.PRIDE_MARKET_CHANNEL_ID;
+    return false;
+  });
+
+  if (activeBots.length === 0) {
+    console.warn('⚠️  Nenhum Canal de Servidor configurado (ZGAMING_MARKET_CHANNEL_ID, etc). Poller desativado.');
+    return;
+  }
+
+  const names = activeBots.map(s => s.name).join(' & ');
+  console.log(`🔄 L2 Market Poller ativo (a cada ${POLL_INTERVAL_MS / 1000}s) — Ouvindo: ${names}`);
 
   // First poll immediately, then every 5s
-  pollMessages();
-  setInterval(pollMessages, POLL_INTERVAL_MS);
+  pollAll();
+  setInterval(pollAll, POLL_INTERVAL_MS);
 }
 
 // Auto-start when run directly (Railway/standalone)

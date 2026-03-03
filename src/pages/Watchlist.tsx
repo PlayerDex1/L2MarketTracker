@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellOff, Trash2, Clock, Plus, Zap, History, Send, CheckCircle, Disc } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
+import { useServer } from '../lib/ServerContext';
 
 interface MarketItem {
     id: string;
@@ -15,6 +16,7 @@ interface MarketItem {
 interface MarketAlert {
     id: string;
     keyword: string;
+    server_id: string;
     max_price?: number;
     min_enhancement?: number;
     created_at: string;
@@ -22,6 +24,7 @@ interface MarketAlert {
 
 export default function Watchlist() {
     const { user, signInWithDiscord } = useAuth();
+    const { activeServer } = useServer();
     const [alerts, setAlerts] = useState<MarketAlert[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -31,10 +34,10 @@ export default function Watchlist() {
             setLoading(false);
             return;
         }
-        const { data } = await supabase.from('user_alerts').select('*').order('created_at', { ascending: false });
+        const { data } = await supabase.from('user_alerts').select('*').eq('server_id', activeServer).order('created_at', { ascending: false });
         if (data) setAlerts(data);
         setLoading(false);
-    }, [user]);
+    }, [user, activeServer]);
 
     useEffect(() => {
         loadAlerts();
@@ -107,6 +110,9 @@ export default function Watchlist() {
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${alert.server_id === 'pride' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
+                                                {alert.server_id}
+                                            </span>
                                             <p className="text-base font-semibold text-zinc-100">"{alert.keyword}"</p>
                                             {alert.max_price && (
                                                 <span className="text-xs px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded-full text-zinc-300">

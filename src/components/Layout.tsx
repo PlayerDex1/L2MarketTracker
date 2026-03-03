@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { TrendingUp, Bell, BarChart2, Zap, Search, LineChart, LogOut, LogIn } from 'lucide-react';
 import CommandPalette from './CommandPalette';
 import { useAuth } from '../lib/AuthContext';
+import { useServer } from '../lib/ServerContext';
 
 const NAV = [
   { name: 'Live Market', href: '/', icon: TrendingUp },
@@ -14,6 +15,7 @@ export default function Layout() {
   const { pathname } = useLocation();
   const [cmdOpen, setCmdOpen] = useState(false);
   const { user, signInWithDiscord, signOut, loading } = useAuth();
+  const { activeServer, setActiveServer, availableServers } = useServer();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -38,13 +40,33 @@ export default function Layout() {
               <BarChart2 className="w-4 h-4 text-white" />
             </div>
             <span className="font-bold text-lg tracking-tight hidden sm:block">
-              <span className="text-white">ZGaming</span>
+              <span className="text-white">L2</span>
               <span className="text-indigo-400"> Market</span>
             </span>
-            <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-[10px] font-bold text-emerald-400">
-              <Zap className="w-2.5 h-2.5" /> LIVE
-            </span>
           </Link>
+
+          {/* Seletor de Servidor Múltiplo */}
+          <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+            {availableServers.map(server => {
+              const isActive = activeServer === server.id;
+              // Ajusta a cor dinamicamente baseada no theme do config
+              const activeColorClass = server.colorTheme === 'indigo'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : server.colorTheme === 'red'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'bg-zinc-700 text-white shadow-sm';
+
+              return (
+                <button
+                  key={server.id}
+                  onClick={() => setActiveServer(server.id)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${isActive ? activeColorClass : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+                >
+                  {server.name}
+                </button>
+              );
+            })}
+          </div>
 
           {/* CMD+K search bar */}
           <button onClick={() => setCmdOpen(true)}
