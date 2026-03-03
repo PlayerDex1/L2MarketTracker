@@ -18,6 +18,11 @@ export default function Layout() {
   const { activeServer, setActiveServer, availableServers } = useServer();
 
   useEffect(() => {
+    const serverName = availableServers.find(s => s.id === activeServer)?.name || 'L2';
+    document.title = `${serverName} Market Tracker`;
+  }, [activeServer, availableServers]);
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
