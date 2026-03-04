@@ -26,16 +26,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const checkAndSaveUser = async (currentSession: Session | null) => {
+            if (currentSession?.user) {
+                const discordId = currentSession.user.user_metadata?.provider_id || currentSession.user.user_metadata?.sub;
+                const username = currentSession.user.user_metadata?.custom_claims?.global_name || currentSession.user.user_metadata?.full_name || 'Usuário Discord';
+
+                if (discordId) {
+                    // Try to upsert the user info directly from the frontend
+                    await supabase.from('discord_users').upsert({
+                        id: currentSession.user.id,
+                        discord_id: discordId,
+                        username: username
+                    }, { onConflict: 'id' }).select().single();
+                }
+            }
+        };
+
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
+            if (session) checkAndSaveUser(session);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
+            if (session) checkAndSaveUser(session);
         });
 
         return () => subscription.unsubscribe();
