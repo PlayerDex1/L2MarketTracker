@@ -57,8 +57,11 @@ function parseMessage(msg: any): { name: string; price: number; currency: string
       itemName = cleanEmojis(embed.author.name)
         .replace(/\s*was added on the market\.?\s*/gi, '')
         .trim();
-    } else if (embed.title && !/^\s*price\s*$/i.test(embed.title)) {
-      itemName = cleanEmojis(embed.title);
+    } else if (embed.title) {
+      // Remove common Pride suffix
+      itemName = cleanEmojis(embed.title)
+        .replace(/\s*was added on the market\.?\s*/gi, '')
+        .trim();
     }
 
     // 2. Item name from specific field
@@ -91,7 +94,16 @@ function parseMessage(msg: any): { name: string; price: number; currency: string
       }
     }
 
-    // 5. Price from full text fallback
+    // 5. Price from description text (Pride Format)
+    if (!price && embed.description) {
+      const descMatch = cleanEmojis(embed.description).match(/Price:\s*(\d+(?:[,.]\d+)*)\s*(Pride Coin|zCoin|Adena)/i);
+      if (descMatch) {
+        price = parseFloat(descMatch[1].replace(/,/g, ''));
+        currency = descMatch[2].trim();
+      }
+    }
+
+    // 6. Price from full text fallback
     if (!price) {
       const fullText = cleanEmojis([
         embed.title || '',
