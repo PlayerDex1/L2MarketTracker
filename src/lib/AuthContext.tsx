@@ -42,10 +42,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signInWithDiscord = async () => {
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const redirectUrl = isLocalhost
+            ? window.location.origin
+            : 'https://gerencimanento-de-clan.vercel.app'; // Força para a URL principal em produção
+
         await supabase.auth.signInWithOAuth({
             provider: 'discord',
             options: {
-                redirectTo: window.location.origin,
+                redirectTo: redirectUrl,
             },
         });
     };
