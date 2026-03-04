@@ -321,40 +321,44 @@ app.post('/api/market/items', (req, res) => {
   res.json({ success: true, item, triggeredAlerts: triggered.length });
 });
 
-// GET all alerts
-app.get('/api/market/alerts', (req, res) => {
-  res.json(marketAlerts);
+// GET all alerts for a user
+app.get('/api/user_alerts', async (req, res) => {
+  const userId = req.query.user_id as string;
+  const serverId = req.query.server_id as string;
+  if (!userId) return res.status(400).json({ error: 'Missing user_id' });
+
+  let query = supabase.from('user_alerts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  if (serverId) query = query.eq('server_id', serverId);
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 
-// POST create alert
-app.post('/api/market/alerts', (req, res) => {
-  const { keyword } = req.body;
-  if (!keyword) return res.status(400).json({ error: 'Missing keyword' });
-  const alert = {
-    id: `alert_${Date.now()}`,
-    keyword: keyword.trim(),
-    created_at: new Date().toISOString(),
-    triggered: false,
-    lastMatch: null,
-  };
-  marketAlerts.push(alert);
-  res.json({ success: true, alert });
+// POST create alert (BYPASS RLS JWT expiration)
+app.post('/api/user_alerts', async (req, res) => {
+  const { user_id, discord_id, server_id, keyword, max_price, min_enhancement } = req.body;
+  if (!user_id || !discord_id || !keyword) return res.status(400).json({ error: 'Missing required fields' });
+
+  // Usando RPC (Security Definer) para bypassar o RLS do anon_key
+  const { data, error } = await supabase.rpc('insert_user_alert', {
+    p_user_id: user_id,
+    p_discord_id: discord_id,
+    p_server_id: server_id || 'zgaming',
+    p_keyword: keyword.trim(),
+    p_max_price: max_price || null,
+    p_min_enhancement: min_enhancement || null
+  });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, alert: data });
 });
 
 // DELETE alert
-app.delete('/api/market/alerts/:alertId', (req, res) => {
-  const idx = marketAlerts.findIndex(a => a.id === req.params.alertId);
-  if (idx === -1) return res.status(404).json({ error: 'Alert not found' });
-  marketAlerts.splice(idx, 1);
-  res.json({ success: true });
-});
-
-// Mark alert as seen (reset triggered)
-app.patch('/api/market/alerts/:alertId/seen', (req, res) => {
-  const alert = marketAlerts.find(a => a.id === req.params.alertId);
-  if (!alert) return res.status(404).json({ error: 'Alert not found' });
-  alert.triggered = false;
-  alert.lastMatch = null;
+app.delete('/api/user_alerts/:id', async (req, res) => {
+  const alertId = req.params.id;
+  const { error } = await supabase.rpc('delete_user_alert', { p_id: alertId });
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 

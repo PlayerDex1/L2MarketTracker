@@ -34,8 +34,15 @@ export default function Watchlist() {
             setLoading(false);
             return;
         }
-        const { data } = await supabase.from('user_alerts').select('*').eq('server_id', activeServer).order('created_at', { ascending: false });
-        if (data) setAlerts(data);
+        try {
+            const res = await fetch(`/api/user_alerts?user_id=${user.id}&server_id=${activeServer}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data) setAlerts(data);
+            }
+        } catch (e) {
+            console.error('Error loading alerts:', e);
+        }
         setLoading(false);
     }, [user, activeServer]);
 
@@ -46,8 +53,13 @@ export default function Watchlist() {
     const handleDelete = async (id: string) => {
         const prev = [...alerts];
         setAlerts(prev.filter(a => a.id !== id));
-        const { error } = await supabase.from('user_alerts').delete().eq('id', id);
-        if (error) setAlerts(prev); // rollback
+        try {
+            const res = await fetch(`/api/user_alerts/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+        } catch (error) {
+            console.error(error);
+            setAlerts(prev); // rollback
+        }
     };
 
     const formatTime = (iso: string) => new Date(iso).toLocaleString('pt-BR', {

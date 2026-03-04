@@ -108,10 +108,13 @@ export default function MarketHome() {
             setAlerts([]);
             return;
         }
-        const { data } = await supabase.from('user_alerts').select('*').order('created_at', { ascending: false });
-        if (data) {
-            setAlerts(data.map((a: any) => ({ ...a, triggered: false, lastMatch: null, history: [] })));
-        }
+        try {
+            const res = await fetch(`/api/user_alerts?user_id=${user.id}`);
+            if (res.ok) {
+                const data = await res.json();
+                setAlerts(data.map((a: any) => ({ ...a, triggered: false, lastMatch: null, history: [] })));
+            }
+        } catch (e) { console.error('Error loading alerts via API', e); }
     }, [user]);
 
     useEffect(() => {
@@ -158,18 +161,30 @@ export default function MarketHome() {
 
         const discord_id = user.user_metadata?.provider_id || user.user_metadata?.sub || '';
 
-        const { data, error } = await supabase.from('user_alerts').insert({
-            user_id: user.id,
-            discord_id,
-            server_id: activeServer,
-            keyword: newKeyword.trim(),
-            max_price: newMaxPrice ? parseFloat(newMaxPrice) : null,
-            min_enhancement: newMinEnhancement ? parseInt(newMinEnhancement) : null,
-        }).select().single();
+        try {
+            const res = await fetch('/api/user_alerts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.id,
+                    discord_id,
+                    server_id: activeServer,
+                    keyword: newKeyword.trim(),
+                    max_price: newMaxPrice ? parseFloat(newMaxPrice) : null,
+                    min_enhancement: newMinEnhancement ? parseInt(newMinEnhancement) : null,
+                })
+            });
 
-        if (data) {
-            updateAlertState([{ ...data, triggered: false, lastMatch: null, history: [] }, ...alerts]);
+            if (res.ok) {
+                const { alert: data } = await res.json();
+                if (data) updateAlertState([{ ...data, triggered: false, lastMatch: null, history: [] }, ...alerts]);
+            } else {
+                console.error('Failed to save alert via API', await res.text());
+            }
+        } catch (err) {
+            console.error('Error creating alert via API', err);
         }
+
         setNewKeyword(''); setNewMaxPrice(''); setNewMinEnhancement(''); setAlertModal(false);
     };
 
