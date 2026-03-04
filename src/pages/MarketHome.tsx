@@ -75,6 +75,7 @@ function formatTime(iso: string) {
 }
 
 export default function MarketHome() {
+    const isPrideTenant = import.meta.env.VITE_TENANT === 'pride';
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { user, signInWithDiscord } = useAuth();
@@ -233,8 +234,8 @@ export default function MarketHome() {
             {/* Page header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-zinc-100">Live Market</h1>
-                    <p className="text-sm text-zinc-500 mt-0.5">ZGaming — Lineage 2 market feed em tempo real</p>
+                    <h1 className="text-2xl font-bold text-zinc-100">{isPrideTenant ? 'Pride Market' : 'Live Market'}</h1>
+                    <p className="text-sm text-zinc-500 mt-0.5">{isPrideTenant ? 'Pride — Lineage 2 market feed em tempo real' : 'ZGaming — Lineage 2 market feed em tempo real'}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${live ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
@@ -242,19 +243,21 @@ export default function MarketHome() {
                         {live ? 'LIVE' : 'Offline'}
                         {lastUpdate && <span className="text-zinc-500 font-normal hidden sm:inline">· {formatTime(lastUpdate.toISOString())}</span>}
                     </div>
-                    <button onClick={() => user ? setAlertModal(true) : signInWithDiscord()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">
-                        <Bell className="w-3.5 h-3.5" /> Novo Alerta
-                    </button>
+                    {!isPrideTenant && (
+                        <button onClick={() => user ? setAlertModal(true) : signInWithDiscord()}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">
+                            <Bell className="w-3.5 h-3.5" /> Novo Alerta
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Stats bar */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className={`grid gap-3 ${isPrideTenant ? 'grid-cols-2' : 'grid-cols-3'}`}>
                 {[
-                    { label: 'Itens hoje', value: todayItems.length.toString(), icon: TrendingUp, color: 'text-indigo-400' },
-                    { label: 'Preço médio', value: `${avgPrice} zCoin`, icon: DollarSign, color: 'text-amber-400' },
-                    { label: 'Alertas ativos', value: alerts.length.toString(), icon: Bell, color: 'text-emerald-400' },
+                    { label: 'Itens hoje', value: todayItems.length.toString(), icon: TrendingUp, color: isPrideTenant ? 'text-red-400' : 'text-indigo-400' },
+                    { label: 'Preço médio', value: `${avgPrice.toLocaleString()} ${isPrideTenant ? 'Pride Coin' : 'zCoin'}`, icon: DollarSign, color: 'text-amber-400' },
+                    ...(isPrideTenant ? [] : [{ label: 'Alertas ativos', value: alerts.length.toString(), icon: Bell, color: 'text-emerald-400' }])
                 ].map(s => (
                     <div key={s.label} className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
@@ -269,7 +272,7 @@ export default function MarketHome() {
             </div>
 
             {/* Triggered alerts */}
-            {triggeredAlerts.map(alert => (
+            {!isPrideTenant && triggeredAlerts.map(alert => (
                 <div key={alert.id} className="flex items-center justify-between gap-4 px-4 py-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
                     <div className="flex items-center gap-3">
                         <Zap className="w-4 h-4 text-amber-400 shrink-0" />
@@ -316,7 +319,7 @@ export default function MarketHome() {
                                     <th className="px-4 py-2.5 text-left cursor-pointer hover:text-zinc-300 transition-colors" onClick={() => handleSort('timestamp')}>
                                         <div className="flex items-center gap-1">Hora <ArrowUpDown className="w-3 h-3" /></div>
                                     </th>
-                                    <th className="px-4 py-2.5 text-right">Ação</th>
+                                    {!isPrideTenant && <th className="px-4 py-2.5 text-right">Ação</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-800/50">
@@ -369,12 +372,14 @@ export default function MarketHome() {
                                             <td className="px-4 py-2.5 text-zinc-500 text-xs">
                                                 <div className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatTime(item.timestamp)}</div>
                                             </td>
-                                            <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-                                                <button onClick={() => { if (!user) { signInWithDiscord(); return; } setNewKeyword(normalizeItemName(item.name)); setAlertModal(true); }}
-                                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${matched ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400'}`}>
-                                                    <Bell className="w-3 h-3" />{matched ? 'Watching' : 'Alert'}
-                                                </button>
-                                            </td>
+                                            {!isPrideTenant && (
+                                                <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+                                                    <button onClick={() => { if (!user) { signInWithDiscord(); return; } setNewKeyword(normalizeItemName(item.name)); setAlertModal(true); }}
+                                                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${matched ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400'}`}>
+                                                        <Bell className="w-3 h-3" />{matched ? 'Watching' : 'Alert'}
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}
@@ -410,42 +415,6 @@ export default function MarketHome() {
                     </div>
                 </div>
             </div>
-
-            {/* Alert modal */}
-            {alertModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md shadow-2xl">
-                        <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-                            <div className="flex items-center gap-2"><Bell className="w-4 h-4 text-indigo-400" /><h2 className="font-bold text-zinc-100">Criar Alerta</h2></div>
-                            <button onClick={() => { setAlertModal(false); setNewKeyword(''); setNewMaxPrice(''); setNewMinEnhancement(''); }} className="text-zinc-500 hover:text-zinc-300"><X className="w-5 h-5" /></button>
-                        </div>
-                        <form onSubmit={handleAddAlert} className="p-4 space-y-3">
-                            <div>
-                                <label className="block text-xs font-medium text-zinc-400 mb-1">Item *</label>
-                                <input required type="text" value={newKeyword} onChange={e => setNewKeyword(e.target.value)}
-                                    placeholder="ex: Talisman of Aden"
-                                    className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-zinc-400 mb-1">Preço máximo (zCoin)</label>
-                                    <input type="number" min="1" value={newMaxPrice} onChange={e => setNewMaxPrice(e.target.value)} placeholder="ex: 50"
-                                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-zinc-400 mb-1">Enhancement mín.</label>
-                                    <input type="number" min="1" max="15" value={newMinEnhancement} onChange={e => setNewMinEnhancement(e.target.value)} placeholder="ex: 5"
-                                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-1">
-                                <button type="button" onClick={() => setAlertModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-                                <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold">Criar Alerta</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

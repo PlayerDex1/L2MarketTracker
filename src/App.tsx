@@ -8,6 +8,8 @@ import { AuthProvider } from './lib/AuthContext';
 import { ServerProvider } from './lib/ServerContext';
 
 export default function App() {
+  const isPrideTenant = import.meta.env.VITE_TENANT === 'pride';
+
   return (
     <AuthProvider>
       <ServerProvider>
@@ -16,7 +18,7 @@ export default function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<MarketHome />} />
               <Route path="item/:name" element={<ItemDetail />} />
-              <Route path="watchlist" element={<Watchlist />} />
+              <Route path="watchlist" element={isPrideTenant ? <Navigate to="/" replace /> : <Watchlist />} />
               <Route path="analytics" element={<Analytics />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

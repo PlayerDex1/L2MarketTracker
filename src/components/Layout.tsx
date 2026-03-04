@@ -5,13 +5,16 @@ import CommandPalette from './CommandPalette';
 import { useAuth } from '../lib/AuthContext';
 import { useServer } from '../lib/ServerContext';
 
-const NAV = [
+const ALL_NAV = [
   { name: 'Live Market', href: '/', icon: TrendingUp },
   { name: 'Analytics', href: '/analytics', icon: LineChart },
   { name: 'Watchlist', href: '/watchlist', icon: Bell },
 ];
 
 export default function Layout() {
+  const isPrideTenant = import.meta.env.VITE_TENANT === 'pride';
+  // Ocultar Watchlist se for tenant sem robô
+  const NAV = isPrideTenant ? ALL_NAV.filter(n => n.name !== 'Watchlist') : ALL_NAV;
   const { pathname } = useLocation();
   const [cmdOpen, setCmdOpen] = useState(false);
   const { user, signInWithDiscord, signOut, loading } = useAuth();
@@ -50,28 +53,30 @@ export default function Layout() {
             </span>
           </Link>
 
-          {/* Seletor de Servidor Múltiplo */}
-          <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
-            {availableServers.map(server => {
-              const isActive = activeServer === server.id;
-              // Ajusta a cor dinamicamente baseada no theme do config
-              const activeColorClass = server.colorTheme === 'indigo'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : server.colorTheme === 'red'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'bg-zinc-700 text-white shadow-sm';
+          {/* Seletor de Servidor Múltiplo (Esconde se só tiver 1) */}
+          {availableServers.length > 1 && (
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+              {availableServers.map(server => {
+                const isActive = activeServer === server.id;
+                // Ajusta a cor dinamicamente baseada no theme do config
+                const activeColorClass = server.colorTheme === 'indigo'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : server.colorTheme === 'red'
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'bg-zinc-700 text-white shadow-sm';
 
-              return (
-                <button
-                  key={server.id}
-                  onClick={() => setActiveServer(server.id)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${isActive ? activeColorClass : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
-                >
-                  {server.name}
-                </button>
-              );
-            })}
-          </div>
+                return (
+                  <button
+                    key={server.id}
+                    onClick={() => setActiveServer(server.id)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${isActive ? activeColorClass : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+                  >
+                    {server.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* CMD+K search bar */}
           <button onClick={() => setCmdOpen(true)}
@@ -99,27 +104,29 @@ export default function Layout() {
             })}
           </nav>
 
-          {/* User / Login */}
-          <div className="flex items-center ml-2 border-l border-zinc-800/60 pl-4 shrink-0">
-            {loading ? (
-              <div className="w-8 h-8 rounded-full bg-zinc-800 animate-pulse"></div>
-            ) : user ? (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <img src={user.user_metadata.avatar_url || `https://ui-avatars.com/api/?name=${user.email}`} alt="Avatar" className="w-8 h-8 rounded-full border border-zinc-700" />
-                  <span className="text-sm font-medium hidden md:inline">{user.user_metadata.custom_claims?.global_name || user.email?.split('@')[0]}</span>
+          {/* User / Login (Esconde se for Tenant s/ Bot) */}
+          {!isPrideTenant && (
+            <div className="flex items-center ml-2 border-l border-zinc-800/60 pl-4 shrink-0">
+              {loading ? (
+                <div className="w-8 h-8 rounded-full bg-zinc-800 animate-pulse"></div>
+              ) : user ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <img src={user.user_metadata.avatar_url || `https://ui-avatars.com/api/?name=${user.email}`} alt="Avatar" className="w-8 h-8 rounded-full border border-zinc-700" />
+                    <span className="text-sm font-medium hidden md:inline">{user.user_metadata.custom_claims?.global_name || user.email?.split('@')[0]}</span>
+                  </div>
+                  <button onClick={signOut} title="Sair" className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                    <LogOut className="w-4 h-4" />
+                  </button>
                 </div>
-                <button onClick={signOut} title="Sair" className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-                  <LogOut className="w-4 h-4" />
+              ) : (
+                <button onClick={signInWithDiscord} className="flex items-center gap-2 px-3 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-lg text-sm font-semibold transition-colors">
+                  <LogIn className="w-4 h-4" />
+                  <span className="hidden sm:inline">Login Discord</span>
                 </button>
-              </div>
-            ) : (
-              <button onClick={signInWithDiscord} className="flex items-center gap-2 px-3 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-lg text-sm font-semibold transition-colors">
-                <LogIn className="w-4 h-4" />
-                <span className="hidden sm:inline">Login Discord</span>
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -128,7 +135,7 @@ export default function Layout() {
       </main>
 
       <footer className="border-t border-zinc-800/40 py-4 text-center text-xs text-zinc-600">
-        ZGaming Market — Lineage 2 Real-time Market Tracker
+        {activeServer === 'pride' ? 'Pride Market — Lineage 2 Real-time Market Tracker' : 'ZGaming Market — Lineage 2 Real-time Market Tracker'}
       </footer>
     </div>
   );
