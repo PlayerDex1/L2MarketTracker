@@ -95,13 +95,17 @@ export default function MarketHome() {
 
     const fetchItems = useCallback(async () => {
         const { data, error } = await supabase
-            .from('market_items').select('*').order('timestamp', { ascending: false }).limit(100);
+            .from('market_items')
+            .select('*')
+            .eq('server_id', activeServer)
+            .order('timestamp', { ascending: false })
+            .limit(100);
         if (!error && data) {
             setItems(data.map((d: any) => ({ id: d.id, name: d.name, price: d.price, currency: d.currency, timestamp: d.timestamp, iconUrl: d.icon_url || '' })));
             setLive(true); setLastUpdate(new Date());
         }
         setLoading(false);
-    }, []);
+    }, [activeServer]);
 
     const loadAlerts = useCallback(async () => {
         if (!user) {
@@ -109,13 +113,13 @@ export default function MarketHome() {
             return;
         }
         try {
-            const res = await fetch(`/api/user_alerts?user_id=${user.id}`);
+            const res = await fetch(`/api/user_alerts?user_id=${user.id}&server_id=${activeServer}`);
             if (res.ok) {
                 const data = await res.json();
                 setAlerts(data.map((a: any) => ({ ...a, triggered: false, lastMatch: null, history: [] })));
             }
         } catch (e) { console.error('Error loading alerts via API', e); }
-    }, [user]);
+    }, [user, activeServer]);
 
     useEffect(() => {
         const queryAlert = searchParams.get('alert');
@@ -131,7 +135,12 @@ export default function MarketHome() {
     };
 
     useEffect(() => {
-        fetchItems(); loadAlerts();
+        // Limpa a tela imediatamente ao trocar de servidor para evitar glitch visual
+        setItems([]);
+        setLoading(true);
+        fetchItems();
+        loadAlerts();
+
         const interval = setInterval(fetchItems, POLL_INTERVAL);
         const channel = supabase.channel('market_realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'market_items' }, (payload) => {
