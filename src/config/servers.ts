@@ -17,7 +17,7 @@ export const SERVERS: ServerConfig[] = [
         id: 'pride',
         name: 'Pride',
         colorTheme: 'red',
-        currency: 'zCoin', // Assumindo zcoin provisoriamente, será adaptado no parser
+        currency: 'Pride Coin',
     }
 ];
 

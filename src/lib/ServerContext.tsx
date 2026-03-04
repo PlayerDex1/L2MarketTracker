@@ -17,17 +17,20 @@ const ServerContext = createContext<ServerContextProps>({
 
 export function ServerProvider({ children }: { children: React.ReactNode }) {
     const tenant = import.meta.env.VITE_TENANT as string | undefined;
+    const isTenantLocked = !!(tenant && SERVERS.some(s => s.id === tenant));
 
-    // Inicializamos pegando do localStorage para lembrar a escolha do usuário, ou cravado no TENANT
+    // Se VITE_TENANT estiver definido, o servidor é SEMPRE travado naquele tenant.
+    // O localStorage só é consultado no modo multi-servidor.
     const [activeServer, setActiveServerState] = useState<string>(() => {
-        if (tenant && SERVERS.some(s => s.id === tenant)) return tenant;
+        if (isTenantLocked) return tenant!;
         const saved = localStorage.getItem('@l2market:server');
         return SERVERS.some(s => s.id === saved) ? saved! : SERVERS[0].id;
     });
 
-    const activeAvailableServers = tenant ? SERVERS.filter(s => s.id === tenant) : SERVERS;
+    const activeAvailableServers = isTenantLocked ? SERVERS.filter(s => s.id === tenant) : SERVERS;
 
     const setActiveServer = (serverId: string) => {
+        if (isTenantLocked) return; // impede troca quando tenant está fixado
         setActiveServerState(serverId);
         localStorage.setItem('@l2market:server', serverId);
     };
